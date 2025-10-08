@@ -9,13 +9,13 @@ class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
-  State<MyApp> createState() => _HomeScreen();
+  State<MyApp> createState() => _MyAppState();
 }
 
-class _HomeScreen extends State<MyApp> {
+class _MyAppState extends State<MyApp> {
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
-  String _status = 'Waiting for link...';
 
   @override
   void initState() {
@@ -30,34 +30,35 @@ class _HomeScreen extends State<MyApp> {
     try {
       final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) {
-        _handleIncomingLink(initialUri);
+        // Delay navigation to ensure the app is fully loaded
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _handleIncomingLink(initialUri);
+        });
       }
     } catch (e) {
-      setState(() => _status = 'Failed to get initial link: $e');
+      print('Failed to get initial link: $e');
     }
 
     // Handle links while app is running
     _linkSubscription = _appLinks.uriLinkStream.listen(
       (Uri uri) => _handleIncomingLink(uri),
       onError: (err) {
-        setState(() => _status = 'Failed to receive link: $err');
+        print('Failed to receive link: $err');
       },
     );
   }
 
   void _handleIncomingLink(Uri uri) {
-    setState(() => _status = 'Received link: $uri');
+    print('Received link: $uri');
 
     if (uri.host == 'details') {
       final id = uri.pathSegments.isNotEmpty ? uri.pathSegments[0] : 'unknown';
-      Navigator.push(
-        context,
+      navigatorKey.currentState?.push(
         MaterialPageRoute(builder: (context) => DetailsScreen(id: id)),
       );
     } else if (uri.host == 'profile') {
       final username = uri.pathSegments.isNotEmpty ? uri.pathSegments[0] : 'unknown';
-      Navigator.push(
-        context,
+      navigatorKey.currentState?.push(
         MaterialPageRoute(builder: (context) => ProfileScreen(username: username)),
       );
     }
@@ -73,21 +74,29 @@ class _HomeScreen extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Deep Link Demo',
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text("Yuri Website"),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text("i love women. see yuri on myapp://details/42"),
-              const SizedBox(height: 20),
-              const Text("Also try myapp://profile/alex"),
-              const SizedBox(height: 20),
-              Text(_status),
-            ],
-          ),
+      navigatorKey: navigatorKey,
+      home: const HomeScreen(),
+    );
+  }
+}
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Yuri Website"),
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text("i love women. see yuri on myapp://details/42"),
+            SizedBox(height: 20),
+            Text("Also try myapp://profile/alex"),
+          ],
         ),
       ),
     );
